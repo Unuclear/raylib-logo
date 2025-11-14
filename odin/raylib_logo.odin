@@ -53,22 +53,28 @@ LogoState :: enum {
 
 
 LogoText: cstring : "raylib"
-PoweredByText: cstring: "powered by"
+PoweredByText: cstring : "powered by"
 
 
 raylibLogoAnimation :: proc(
 	fps: c.int = 60,
 	backgroundColor: raylib.Color = raylib.RAYWHITE,
 	logoColor: raylib.Color = raylib.BLACK,
+	blinkStop: c.int = 60,
 	squareStrokeWidth: c.int = 16,
+	squareGrowthRate: c.int = 4,
+	letterAppearanceRate: c.int = 8,
+	zoomOutSpeed: c.float = 0.0025,
+	zoomOutStop: c.float = 0.85,
 	poweredByCustomFont: ^raylib.Font = nil,
 	poweredByFontSizeFactor: c.float = 3,
-	poweredBySpacing: c.float = 8
+	poweredBySpacing: c.float = 8,
+	poweredByFadeInSpeed: c.float = 0.02,
+	fadeOutSpeed: c.float = 0.02,
 ) {
 	// Initialization
 	//--------------------------------------------------------------------------------------
 	// Settings
-	squareGrowthRate := squareStrokeWidth / 4 // side growth per frame
 	squareSide := squareStrokeWidth * squareStrokeWidth
 	squareSideNoOverlap := squareSide - squareStrokeWidth // to prevent overlap with the top side
 	//squareFillSize := squareSideNoOverlap - squareStrokeWidth // inner square
@@ -78,11 +84,16 @@ raylibLogoAnimation :: proc(
 	else do poweredByFont = raylib.GetFontDefault()
 
 	poweredByFontSize := c.float(poweredByFont.baseSize) * poweredByFontSizeFactor
-	poweredByDimensions := raylib.MeasureTextEx(poweredByFont, PoweredByText, poweredByFontSize, poweredBySpacing)
+	poweredByDimensions := raylib.MeasureTextEx(
+		poweredByFont,
+		PoweredByText,
+		poweredByFontSize,
+		poweredBySpacing,
+	)
 	//-------------------------------------------
 	// State variables
 	state := LogoState.Blink
-	framesCounter: uint
+	framesCounter: c.int
 	topSide, leftSide, bottomSide, rightSide: c.int = squareStrokeWidth, 0, 0, 0 // start with a dot of 16x16 (by default)
 	lettersCount: c.int
 	poweredByAlpha: c.float = 0
@@ -100,10 +111,18 @@ raylibLogoAnimation :: proc(
 	logoPosition := Vector2i{}
 	logoPositionOffset: c.int = squareSide / 2
 	poweredByPosition := raylib.Vector2{}
-	poweredByPositionOffsets := raylib.Vector2{poweredByDimensions.x / 2, poweredByDimensions.y + poweredBySpacing}
+	poweredByPositionOffsets := raylib.Vector2 {
+		poweredByDimensions.x / 2,
+		poweredByDimensions.y + poweredBySpacing,
+	}
 	//-------------------------------------------
 	// Camera
-	camera := raylib.Camera2D{target={}, offset={}, rotation=0.0, zoom=1.0}
+	camera := raylib.Camera2D {
+		target   = {},
+		offset   = {},
+		rotation = 0.0,
+		zoom     = 1.0,
+	}
 	//-------------------------------------------
 	// FPS
 	raylib.SetTargetFPS(fps)
@@ -113,7 +132,8 @@ raylibLogoAnimation :: proc(
 		// Update
 		//----------------------------------------------------------------------------------
 		// On Enter or screen tap, skip logo animation
-		if raylib.IsKeyPressed(raylib.KeyboardKey.ENTER) || raylib.IsGestureDetected(raylib.Gesture.TAP) {
+		if raylib.IsKeyPressed(raylib.KeyboardKey.ENTER) ||
+		   raylib.IsGestureDetected(raylib.Gesture.TAP) {
 			state = .Loaded
 		}
 
@@ -121,7 +141,7 @@ raylibLogoAnimation :: proc(
 			case .Blink:
 				framesCounter += 1
 
-				if framesCounter == 60 {
+				if framesCounter == blinkStop {
 					state = .TopLeftSides
 					framesCounter = 0 // Reset for later reuse
 				}
@@ -145,8 +165,20 @@ raylibLogoAnimation :: proc(
 					raylib.DrawRectangle(0, 0, topSide, squareStrokeWidth, logoColor)
 					raylib.DrawRectangle(0, squareStrokeWidth, squareStrokeWidth, leftSide, logoColor)
 
-					raylib.DrawRectangle(squareSideNoOverlap, squareStrokeWidth, squareStrokeWidth, rightSide, logoColor)
-					raylib.DrawRectangle(squareStrokeWidth, squareSideNoOverlap, bottomSide, squareStrokeWidth, logoColor)
+					raylib.DrawRectangle(
+						squareSideNoOverlap,
+						squareStrokeWidth,
+						squareStrokeWidth,
+						rightSide,
+						logoColor,
+					)
+					raylib.DrawRectangle(
+						squareStrokeWidth,
+						squareSideNoOverlap,
+						bottomSide,
+						squareStrokeWidth,
+						logoColor,
+					)
 
 					//raylib.DrawRectangle(squareStrokeWidth, squareStrokeWidth, squareFillSize, squareFillSize, backgroundColor)
 				} else do bottomSide += squareGrowthRate // to prevent overlap with left and right sides
@@ -154,8 +186,8 @@ raylibLogoAnimation :: proc(
 			case .Letters:
 				framesCounter += 1
 
-				// One letter every 8 frames
-				if framesCounter == 8 {
+				// One new letter every X frames
+				if framesCounter == letterAppearanceRate {
 					lettersCount += 1
 					framesCounter = 0
 				}
@@ -169,23 +201,28 @@ raylibLogoAnimation :: proc(
 
 					raylib.DrawTextureRec(
 						squareRt.texture,
-						raylib.Rectangle{0, 0, c.float(squareRt.texture.width), -c.float(squareRt.texture.height)}, // y-axis is flipped
+						raylib.Rectangle {
+							0,
+							0,
+							c.float(squareRt.texture.width),
+							-c.float(squareRt.texture.height), // y-axis is flipped
+						},
 						raylib.Vector2{0, 0},
-						raylib.WHITE
+						raylib.WHITE,
 					)
 
 					raylib.DrawText(LogoText, 84, 176, 50, logoColor)
 				}
 
 			case .ZoomOut:
-				camera.zoom -= 0.0025
+				camera.zoom -= zoomOutSpeed
 
-				if camera.zoom <= 0.85 do state = .FadeOut
+				if camera.zoom <= zoomOutStop do state = .FadeOut
 				else if poweredByAlpha >= 1 do poweredByAlpha = 1
-				else do poweredByAlpha += 0.02
+				else do poweredByAlpha += poweredByFadeInSpeed
 
 			case .FadeOut:
-				alpha -= 0.02
+				alpha -= fadeOutSpeed
 
 				if alpha <= 0 do state = .Loaded
 
@@ -196,21 +233,23 @@ raylibLogoAnimation :: proc(
 
 		// If screen dimensions have changed
 		if screenWidth != lastScreenWidth || screenHeight != lastScreenHeight {
+			lastScreenWidth, lastScreenHeight = screenWidth, screenHeight
+
 			screenCenter.x = c.float(screenWidth) / 2
 			screenCenter.y = c.float(screenHeight) / 2
 
 			// Adjust logo position
 			logoPosition.x = c.int(screenCenter.x) - logoPositionOffset
 			logoPosition.y = c.int(screenCenter.y) - logoPositionOffset
+		}
 
-			// If camera is used (also implies that "powered by" is displayed)
-			if camera.zoom < 1 {
-				camera.target.x, camera.target.y = screenCenter.x, screenCenter.y
-				camera.offset.x, camera.offset.y = screenCenter.x, screenCenter.y
+		// If camera is used (also implies that "powered by" is displayed)
+		if camera.zoom < 1 {
+			camera.target.x, camera.target.y = screenCenter.x, screenCenter.y
+			camera.offset.x, camera.offset.y = screenCenter.x, screenCenter.y
 
-				poweredByPosition.x = screenCenter.x - poweredByPositionOffsets.x
-				poweredByPosition.y = c.float(logoPosition.y) - poweredByPositionOffsets.y
-			}
+			poweredByPosition.x = screenCenter.x - poweredByPositionOffsets.x
+			poweredByPosition.y = c.float(logoPosition.y) - poweredByPositionOffsets.y
 		}
 		//----------------------------------------------------------------------------------
 
@@ -224,42 +263,107 @@ raylibLogoAnimation :: proc(
 		switch state {
 			case .Blink:
 				if (framesCounter / 15) % 2 != 0 {
-					raylib.DrawRectangle(logoPosition.x, logoPosition.y, squareStrokeWidth, squareStrokeWidth, logoColor)
+					raylib.DrawRectangle(
+						logoPosition.x,
+						logoPosition.y,
+						squareStrokeWidth,
+						squareStrokeWidth,
+						logoColor,
+					)
 				}
 
 			case .TopLeftSides:
-				raylib.DrawRectangle(logoPosition.x, logoPosition.y, topSide, squareStrokeWidth, logoColor)
-				raylib.DrawRectangle(logoPosition.x, logoPosition.y + squareStrokeWidth, squareStrokeWidth, leftSide, logoColor)
+				raylib.DrawRectangle(
+					logoPosition.x,
+					logoPosition.y,
+					topSide,
+					squareStrokeWidth,
+					logoColor,
+				)
+				raylib.DrawRectangle(
+					logoPosition.x,
+					logoPosition.y + squareStrokeWidth,
+					squareStrokeWidth,
+					leftSide,
+					logoColor,
+				)
 
 			case .RightBottomSides:
-				raylib.DrawRectangle(logoPosition.x, logoPosition.y, topSide, squareStrokeWidth, logoColor)
-				raylib.DrawRectangle(logoPosition.x, logoPosition.y + squareStrokeWidth, squareStrokeWidth, leftSide, logoColor)
+				raylib.DrawRectangle(
+					logoPosition.x,
+					logoPosition.y,
+					topSide,
+					squareStrokeWidth,
+					logoColor,
+				)
+				raylib.DrawRectangle(
+					logoPosition.x,
+					logoPosition.y + squareStrokeWidth,
+					squareStrokeWidth,
+					leftSide,
+					logoColor,
+				)
 
-				raylib.DrawRectangle(logoPosition.x + squareSideNoOverlap, logoPosition.y + squareStrokeWidth, squareStrokeWidth, rightSide, logoColor)
-				raylib.DrawRectangle(logoPosition.x + squareStrokeWidth, logoPosition.y + squareSideNoOverlap, bottomSide, squareStrokeWidth, logoColor)
+				raylib.DrawRectangle(
+					logoPosition.x + squareSideNoOverlap,
+					logoPosition.y + squareStrokeWidth,
+					squareStrokeWidth,
+					rightSide,
+					logoColor,
+				)
+				raylib.DrawRectangle(
+					logoPosition.x + squareStrokeWidth,
+					logoPosition.y + squareSideNoOverlap,
+					bottomSide,
+					squareStrokeWidth,
+					logoColor,
+				)
 
 			case .Letters:
 				raylib.DrawTextureRec(
 					squareRt.texture,
-					raylib.Rectangle{0, 0, c.float(squareRt.texture.width), -c.float(squareRt.texture.height)}, // y-axis is flipped
+					raylib.Rectangle {
+						0,
+						0,
+						c.float(squareRt.texture.width),
+						-c.float(squareRt.texture.height), // y-axis is flipped
+					},
 					raylib.Vector2{c.float(logoPosition.x), c.float(logoPosition.y)},
-					raylib.WHITE
+					raylib.WHITE,
 				)
 
-				raylib.DrawText(raylib.TextSubtext(LogoText, 0, lettersCount), logoPosition.x + 84, logoPosition.y + 176, 50, logoColor)
+				raylib.DrawText(
+					raylib.TextSubtext(LogoText, 0, lettersCount),
+					logoPosition.x + 84,
+					logoPosition.y + 176,
+					50,
+					logoColor,
+				)
 
 			case .ZoomOut:
 				{
 					raylib.BeginMode2D(camera)
 					defer raylib.EndMode2D()
 
-					raylib.DrawTextEx(poweredByFont, PoweredByText, poweredByPosition, poweredByFontSize, poweredBySpacing, raylib.Fade(logoColor, poweredByAlpha))
+					raylib.DrawTextEx(
+						poweredByFont,
+						PoweredByText,
+						poweredByPosition,
+						poweredByFontSize,
+						poweredBySpacing,
+						raylib.Fade(logoColor, poweredByAlpha),
+					)
 
 					raylib.DrawTextureRec(
 						logoRt.texture,
-						raylib.Rectangle{0, 0, c.float(logoRt.texture.width), -c.float(logoRt.texture.height)}, // y-axis is flipped
+						raylib.Rectangle {
+							0,
+							0,
+							c.float(logoRt.texture.width),
+							-c.float(logoRt.texture.height), // y-axis is flipped
+						},
 						raylib.Vector2{c.float(logoPosition.x), c.float(logoPosition.y)},
-						raylib.WHITE
+						raylib.WHITE,
 					)
 				}
 
@@ -268,13 +372,25 @@ raylibLogoAnimation :: proc(
 					raylib.BeginMode2D(camera)
 					defer raylib.EndMode2D()
 
-					raylib.DrawTextEx(poweredByFont, PoweredByText, poweredByPosition, poweredByFontSize, poweredBySpacing, raylib.Fade(logoColor, alpha))
+					raylib.DrawTextEx(
+						poweredByFont,
+						PoweredByText,
+						poweredByPosition,
+						poweredByFontSize,
+						poweredBySpacing,
+						raylib.Fade(logoColor, alpha),
+					)
 
 					raylib.DrawTextureRec(
 						logoRt.texture,
-						raylib.Rectangle{0, 0, c.float(logoRt.texture.width), -c.float(logoRt.texture.height)}, // y-axis is flipped
+						raylib.Rectangle {
+							0,
+							0,
+							c.float(logoRt.texture.width),
+							-c.float(logoRt.texture.height), // y-axis is flipped
+						},
 						raylib.Vector2{c.float(logoPosition.x), c.float(logoPosition.y)},
-						raylib.Fade(raylib.WHITE, alpha) // fade out entire texture
+						raylib.Fade(raylib.WHITE, alpha), // fade out entire texture
 					)
 				}
 

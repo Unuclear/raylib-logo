@@ -23,6 +23,6 @@ void DefaultRaylibLogoAnimation();
 
 void DefaultRaylibLogoAnimationWithFrameRate(int fps);
 
-void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int squareStrokeWidth, Font* poweredByCustomFont, double poweredByFontSizeFactor, double poweredBySpacing);
+void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int blinkStop, int squareStrokeWidth, int squareGrowthRate, int letterAppearanceRate, float zoomOutSpeed, float zoomOutStop, Font* poweredByCustomFont, float poweredByFontSizeFactor, float poweredBySpacing, float poweredByFadeInSpeed, float fadeOutSpeed);
 
 #endif /* raylib_logo.h */

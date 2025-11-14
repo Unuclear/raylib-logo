@@ -45,15 +45,29 @@ void DefaultRaylibLogoAnimation() {
 
 
 void DefaultRaylibLogoAnimationWithFrameRate(int fps) {
-	RaylibLogoAnimation(fps, RAYWHITE, BLACK, 16, NULL, 3, 8);
+	RaylibLogoAnimation(fps, RAYWHITE, BLACK, 60, 16, 4, 8, 0.0025f, 0.85f, NULL, 3.0f, 8.0f, 0.02f, 0.02f);
 }
 
 
-void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int squareStrokeWidth, Font* poweredByCustomFont, double poweredByFontSizeFactor, double poweredBySpacing) {
+void RaylibLogoAnimation(
+	int fps,
+	Color backgroundColor,
+	Color logoColor,
+	int blinkStop,
+	int squareStrokeWidth,
+	int squareGrowthRate,
+	int letterAppearanceRate,
+	float zoomOutSpeed,
+	float zoomOutStop,
+	Font* poweredByCustomFont,
+	float poweredByFontSizeFactor,
+	float poweredBySpacing,
+	float poweredByFadeInSpeed,
+	float fadeOutSpeed
+) {
 	// Initialization
 	//--------------------------------------------------------------------------------------
 	// Settings
-	int squareGrowthRate = squareStrokeWidth / 4; // side growth per frame
 	int squareSide = squareStrokeWidth * squareStrokeWidth;
 	int squareSideNoOverlap = squareSide - squareStrokeWidth; // to prevent overlap with the top side
 	//int squareFillSize = squareSideNoOverlap - squareStrokeWidth; // inner square
@@ -69,9 +83,9 @@ void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int sq
 	//-------------------------------------------
 	// State variables
 	LogoState state = Blink;
-	unsigned int framesCounter = 0;
+	int framesCounter = 0;
 	int topSide = squareStrokeWidth, leftSide = 0, bottomSide = 0, rightSide = 0; // start with a dot of 16x16 (by default)
-	unsigned int lettersCount = 0;
+	int lettersCount = 0;
 	float poweredByAlpha = 0.0f;
 	float alpha = 1.0f;
 	//-------------------------------------------
@@ -106,7 +120,7 @@ void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int sq
 			case Blink:
 				framesCounter++;
 
-				if (framesCounter == 60) {
+				if (framesCounter == blinkStop) {
 					state = TopLeftSides;
 					framesCounter = 0; // Reset for later reuse
 				}
@@ -149,8 +163,8 @@ void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int sq
 			case Letters:
 				framesCounter++;
 
-				// One letter every 8 frames
-				if (framesCounter == 8) {
+				// One letter every X frames
+				if (framesCounter == letterAppearanceRate) {
 					lettersCount++;
 					framesCounter = 0;
 				}
@@ -176,19 +190,19 @@ void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int sq
 				break;
 
 			case ZoomOut:
-				camera.zoom -= 0.0025f;
+				camera.zoom -= zoomOutSpeed;
 
-				if (camera.zoom <= 0.85f)
+				if (camera.zoom <= zoomOutStop)
 					state = FadeOut;
 				else if (poweredByAlpha >= 1.0f)
 					poweredByAlpha = 1.0f;
 				else
-					poweredByAlpha += 0.02f;
+					poweredByAlpha += poweredByFadeInSpeed;
 
 				break;
 
 			case FadeOut:
-				alpha -= 0.02f;
+				alpha -= fadeOutSpeed;
 
 				if (alpha <= 0.0f)
 					state = Loaded;
@@ -204,24 +218,27 @@ void RaylibLogoAnimation(int fps, Color backgroundColor, Color logoColor, int sq
 
 		// If screen dimensions have changed
 		if (screenWidth != lastScreenWidth || screenHeight != lastScreenHeight) {
+			lastScreenWidth = screenWidth;
+			lastScreenHeight = screenHeight;
+
 			screenCenter.x = (float)screenWidth / 2.0f;
 			screenCenter.y = (float)screenHeight / 2.0f;
 
 			// Adjust logo position
 			logoPosition.x = (int)screenCenter.x - logoPositionOffset;
 			logoPosition.y = (int)screenCenter.y - logoPositionOffset;
+		}
 
-			// If camera is used (also implies that "powered by" is displayed)
-			if (camera.zoom < 1.0f) {
-				camera.target.x = screenCenter.x;
-				camera.target.y = screenCenter.y;
+		// If camera is used (also implies that "powered by" is displayed)
+		if (camera.zoom < 1.0f) {
+			camera.target.x = screenCenter.x;
+			camera.target.y = screenCenter.y;
 
-				camera.offset.x = screenCenter.x;
-				camera.offset.y = screenCenter.y;
+			camera.offset.x = screenCenter.x;
+			camera.offset.y = screenCenter.y;
 
-				poweredByPosition.x = screenCenter.x - poweredByPositionOffsets.x;
-				poweredByPosition.y = (float)logoPosition.y - poweredByPositionOffsets.y;
-			}
+			poweredByPosition.x = screenCenter.x - poweredByPositionOffsets.x;
+			poweredByPosition.y = (float)logoPosition.y - poweredByPositionOffsets.y;
 		}
 		//----------------------------------------------------------------------------------
 
